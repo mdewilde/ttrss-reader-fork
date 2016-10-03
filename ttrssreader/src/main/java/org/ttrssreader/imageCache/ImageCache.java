@@ -18,16 +18,11 @@
 package org.ttrssreader.imageCache;
 
 import android.graphics.Bitmap;
-import android.os.Environment;
 import android.util.Log;
-import android.widget.Toast;
 
-import org.ttrssreader.MyApplication;
 import org.ttrssreader.utils.FileUtils;
-import org.ttrssreader.utils.Utils;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -46,44 +41,18 @@ public class ImageCache {
 
 	public ImageCache(int initialCapacity, String cacheDir) {
 		this.cache = new HashSet<>(initialCapacity);
+		this.diskCacheDir = CacheDirMaker.make(cacheDir);
+		this.isDiskCacheEnabled = this.diskCacheDir != null;
+	}
 
-		if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
-
-			// Use configured output directory
-			File folder = new File(cacheDir);
-
-			boolean OK = folder.isDirectory() || folder.mkdirs();
-			if (!OK) {
-				// Folder could not be created, fallback to internal directory on sdcard
-				// Path: /sdcard/Android/data/org.ttrssreader/cache/
-
-				folder = MyApplication.context().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-				if (folder != null) {
-					OK = folder.isDirectory() || folder.mkdirs();
-				}
-			}
-
-			// Create .nomedia File in Cache-Folder so android doesn't generate thumbnails
-			File nomediaFile = new File(folder + File.separator + ".nomedia");
-			if (!nomediaFile.exists()) {
-				try {
-					if (!nomediaFile.createNewFile())
-						Log.w(TAG, "Couldn't create .nomedia File for Disk-Cache!");
-				} catch (IOException e) {
-					// Empty!
-				}
-			}
-
-			if (!OK) {
-				isDiskCacheEnabled = false;
-				final String msg = "Failed to create disk cache directory '" + cacheDir + "'";
-				Log.e(TAG, msg);
-				Utils.showBackgroundToast(MyApplication.context(), msg, Toast.LENGTH_LONG);
-			} else {
-				isDiskCacheEnabled = true;
-				diskCacheDir = folder.getAbsolutePath();
-			}
-		}
+	/**
+	 * create uniq string from file url, which can be used as file name
+	 *
+	 * @param imageUrl URL of given image
+	 * @return calculated hash
+	 */
+	public static String getHashForKey(String imageUrl) {
+		return imageUrl.replaceAll("[:;#~%$\"!<>|+*\\()^/,?&=]+", "+");
 	}
 
 	public boolean isDiskCacheEnabled() {
@@ -109,16 +78,6 @@ public class ImageCache {
 
 	boolean containsKey(String key) {
 		return cache.contains(getFileNameForKey(key)) || isDiskCacheEnabled && getCacheFile(key).exists();
-	}
-
-	/**
-	 * create uniq string from file url, which can be used as file name
-	 *
-	 * @param imageUrl URL of given image
-	 * @return calculated hash
-	 */
-	public static String getHashForKey(String imageUrl) {
-		return imageUrl.replaceAll("[:;#~%$\"!<>|+*\\()^/,?&=]+", "+");
 	}
 
 	private String getFileNameForKey(String imageUrl) {

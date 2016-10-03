@@ -23,6 +23,7 @@ import android.net.ConnectivityManager;
 import android.util.Log;
 
 import org.ttrssreader.R;
+import org.ttrssreader.imageCache.IconCacher;
 import org.ttrssreader.imageCache.ImageCache;
 import org.ttrssreader.model.pojos.Article;
 import org.ttrssreader.model.pojos.Category;
@@ -32,6 +33,7 @@ import org.ttrssreader.net.IArticleOmitter;
 import org.ttrssreader.net.IdUnreadArticleOmitter;
 import org.ttrssreader.net.IdUpdatedArticleOmitter;
 import org.ttrssreader.net.JSONConnector;
+import org.ttrssreader.networkchange.NetworkState;
 import org.ttrssreader.utils.Utils;
 
 import java.util.Collection;
@@ -44,14 +46,12 @@ import java.util.Set;
 @SuppressLint("UseSparseArrays")
 public class Data {
 
-	private static final String TAG = Data.class.getSimpleName();
-
-	private static final int VCAT_UNCAT = 0;
 	public static final int VCAT_STAR = -1;
 	public static final int VCAT_PUB = -2;
 	public static final int VCAT_FRESH = -3;
 	public static final int VCAT_ALL = -4;
-
+	private static final String TAG = Data.class.getSimpleName();
+	private static final int VCAT_UNCAT = 0;
 	private static final String VIEW_ALL = "all_articles";
 	private static final String VIEW_UNREAD = "unread";
 
@@ -73,6 +73,10 @@ public class Data {
 		initTimers();
 	}
 
+	public static Data getInstance() {
+		return InstanceHolder.instance;
+	}
+
 	public void initTimers() {
 		time = 0;
 		articlesCached = 0;
@@ -82,20 +86,10 @@ public class Data {
 		categoriesChanged = 0;
 	}
 
-	private static class InstanceHolder {
-		private static final Data instance = new Data();
-	}
-
-	public static Data getInstance() {
-		return InstanceHolder.instance;
-	}
-
 	public synchronized void initialize(final Context context) {
 		if (context != null)
 			cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
 	}
-
-	// *** ARTICLES *********************************************************************
 
 	/**
 	 * cache all articles
@@ -155,6 +149,8 @@ public class Data {
 		}
 		Log.d(TAG, "cacheArticles() Took: " + (System.currentTimeMillis() - timeStart) + "ms");
 	}
+
+	// *** ARTICLES *********************************************************************
 
 	/**
 	 * update articles for specified feed/category
@@ -300,8 +296,6 @@ public class Data {
 		}
 	}
 
-	// *** FEEDS ************************************************************************
-
 	/**
 	 * update DB (delete/insert) with actual feeds information from server
 	 *
@@ -330,6 +324,9 @@ public class Data {
 				DBHelper.getInstance().deleteFeeds();
 				DBHelper.getInstance().insertFeeds(feeds);
 
+				// TODO: enable code + pass correct minimum allowed network state
+				new Thread(new IconCacher(NetworkState.MOBILE)).start();
+
 				// Store requested category-id and ids of all received feeds
 				feedsChanged.put(categoryId, System.currentTimeMillis());
 				notifyListeners();
@@ -340,7 +337,7 @@ public class Data {
 		return null;
 	}
 
-	// *** CATEGORIES *******************************************************************
+	// *** FEEDS ************************************************************************
 
 	public Set<Category> updateVirtualCategories(final Context context) {
 		if (virtCategoriesChanged > System.currentTimeMillis() - Utils.UPDATE_TIME) return null;
@@ -370,6 +367,8 @@ public class Data {
 		return vCats;
 	}
 
+	// *** CATEGORIES *******************************************************************
+
 	/**
 	 * update DB (delete/insert) with actual categories information from server
 	 *
@@ -395,14 +394,14 @@ public class Data {
 		return null;
 	}
 
-	// *** STATUS *******************************************************************
-
 	public void setArticleRead(Set<Integer> ids, int status) {
 		boolean erg = false;
 		if (Utils.isConnected(cm))
 			erg = Controller.getInstance().getConnector().setArticleRead(ids, status);
 		if (!erg) DBHelper.getInstance().markUnsynchronizedStates(ids, DBHelper.MARK_READ, status);
 	}
+
+	// *** STATUS *******************************************************************
 
 	public void setArticleStarred(int articleId, int status) {
 		boolean erg = false;
@@ -575,6 +574,10 @@ public class Data {
 			Log.d(TAG, "Deleting cached files was successful.");
 		else
 			Log.e(TAG, "Deleting cached files failed at least partially, there were errors!");
+	}
+
+	private static class InstanceHolder {
+		private static final Data instance = new Data();
 	}
 
 }

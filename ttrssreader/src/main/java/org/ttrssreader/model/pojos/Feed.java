@@ -21,11 +21,21 @@ package org.ttrssreader.model.pojos;
 
 public class Feed implements Comparable<Feed> {
 
-	public int id;
-	public int categoryId;
-	public String title;
-	public String url;
-	public int unread;
+	public static final String ID = "id";
+	public static final String CATEGORY_ID = "cat_id";
+	public static final String TITLE = "title";
+	public static final String URL = "feed_url";
+	public static final String UNREAD = "unread";
+	public static final String HAS_ICON = "has_icon";
+	public static final String LAST_UPDATED = "last_updated";
+
+	public int id = 0;
+	public int categoryId = -1;
+	public String title = null;
+	public String url = null;
+	public int unread = 0;
+	public boolean hasIcon = false;
+	public long lastUpdated = 0l;
 
 	@Override
 	public int compareTo(Feed fi) {
@@ -47,4 +57,24 @@ public class Feed implements Comparable<Feed> {
 		return id + "".hashCode();
 	}
 
+	public boolean isValid() {
+		if (id != -1 || categoryId == -2) { // normal feed (>0) or label (-2)
+			if (title != null) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	@Override
+	public String toString() {
+		return "Feed{" +
+				"id=" + id +
+				", categoryId=" + categoryId +
+				", title='" + title + '\'' +
+				", url='" + url + '\'' +
+				", unread=" + unread +
+				", hasIcon=" + hasIcon +
+				'}';
+	}
 }

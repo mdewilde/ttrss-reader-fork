@@ -25,6 +25,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
+import android.net.Uri;
 import android.net.http.HttpResponseCache;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
@@ -42,8 +43,11 @@ import org.ttrssreader.R;
 import org.ttrssreader.gui.CategoryActivity;
 import org.ttrssreader.gui.FeedHeadlineActivity;
 import org.ttrssreader.gui.MenuActivity;
+import org.ttrssreader.imageCache.IconCache;
 import org.ttrssreader.imageCache.ImageCache;
 import org.ttrssreader.net.JSONConnector;
+import org.ttrssreader.networkchange.NetworkChangeSubscriber;
+import org.ttrssreader.networkchange.NetworkStateBroadcastReceiver;
 import org.ttrssreader.preferences.Constants;
 import org.ttrssreader.utils.AsyncTask;
 import org.ttrssreader.utils.SSLUtils;
@@ -63,6 +67,7 @@ import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Not entirely sure why this is called the "Controller". Actually, in terms of MVC, it isn't the controller. There
@@ -71,12 +76,10 @@ import java.util.Set;
 @SuppressWarnings("UnusedDeclaration")
 public class Controller extends Constants implements OnSharedPreferenceChangeListener {
 
+	public final static String JSON_END_URL = "api/index.php";
 	private static final String TAG = Controller.class.getSimpleName();
 	private static final String SIGNATURE = "zu16x7lDmO/+vP+t1svSWI1lJFQ=";
 	private static final String PLAY_STORE_APP_ID = "com.android.vending";
-
-	public final static String JSON_END_URL = "api/index.php";
-
 	private final static char TEMPLATE_DELIMITER_START = '$';
 	private final static char TEMPLATE_DELIMITER_END = '$';
 
@@ -84,24 +87,36 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 	private static final int THEME_LIGHT = 2;
 	private static final int THEME_BLACK = 3;
 	private static final int THEME_WHITE = 4;
-
-	private WifiManager wifiManager;
-
-	private volatile JSONConnector ttrssConnector;
 	private static final Object lockConnector = new Object();
-
+	private static final Object lockImageCache = new Object();
+	private static final Object lockInitialize = new Object();
+	private static final Object lockHtmlTemplate = new Object();
+	private static final String SIZE_VERTICAL_CATEGORY = "sizeVerticalCategory";
+	private static final String SIZE_HORIZONTAL_CATEGORY = "sizeHorizontalCategory";
+	private static final String SIZE_VERTICAL_HEADLINE = "sizeVerticalHeadline";
+	private static final String SIZE_HORIZONTAL_HEADLINE = "sizeHorizontalHeadline";
+	// Article-View-Stuff
+	public static ST htmlTemplate;
+	public static int relSwipeMinDistance;
+	public static int relSwipeMaxOffPath;
+	public static int relSwipeThresholdVelocity;
+	public static int displayHeight;
+	public static int displayWidth;
+	public static boolean isTablet = false;
+	public static int sFragmentAnimationDirection = 0;
+	private static Boolean initialized = false;
+	private static boolean preferencesChanged = false;
+	private final AtomicBoolean iconCacheLoaded = new AtomicBoolean(false);
+	private final NetworkStateBroadcastReceiver networkStateBroadcastReceiver = new NetworkStateBroadcastReceiver();
+	public volatile Set<Integer> lastOpenedFeeds = new HashSet<>();
+	public volatile Set<Integer> lastOpenedArticles = new HashSet<>();
+	private WifiManager wifiManager;
+	private volatile JSONConnector ttrssConnector;
 	private volatile ImageCache imageCache = null;
 	private boolean imageCacheLoaded = false;
-
+	private IconCache iconCache = null;
 	private boolean isHeadless = false;
-	private static final Object lockImageCache = new Object();
-
-	private static Boolean initialized = false;
-	private static final Object lockInitialize = new Object();
-
 	private SharedPreferences prefs = null;
-	private static boolean preferencesChanged = false;
-
 	private Boolean ignoreUnsafeConnectionError = false;
 	private Boolean openUrlEmptyArticle = null;
 	private Boolean useVolumeKeys = null;
@@ -112,7 +127,6 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 	private Boolean workOffline = null;
 	private Boolean allowTabletLayout = null;
 	private Boolean hideFeedReadButtons = null;
-
 	private Boolean animations = null;
 	private Integer textZoom = null;
 	private Boolean supportZoomControls = null;
@@ -130,7 +144,6 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 	private String timeString = null;
 	private String dateTimeString = null;
 	private Integer theme = null;
-
 	private String saveAttachment = null;
 	private String cacheFolder = null;
 	private Integer cacheFolderMaxSize = null;
@@ -143,10 +156,8 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 	private Boolean noCrashreports = null;
 	private Boolean noCrashreportsUntilUpdate = null;
 	private Boolean isFirstRun = null;
-
 	// Set to true per default to avoid never getting reports for bugs during startup
 	private Boolean validInstallation = true;
-
 	private Long appVersionCheckTime = null;
 	private Integer appLatestVersion = null;
 	private String lastVersionRun = null;
@@ -156,34 +167,87 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 	private Long lastSync = null;
 	private Long lastCleanup = null;
 	private Boolean lowMemory = false;
-
-	public volatile Set<Integer> lastOpenedFeeds = new HashSet<>();
-	public volatile Set<Integer> lastOpenedArticles = new HashSet<>();
-
-	// Article-View-Stuff
-	public static ST htmlTemplate;
-	private static final Object lockHtmlTemplate = new Object();
-
-	public static int relSwipeMinDistance;
-	public static int relSwipeMaxOffPath;
-	public static int relSwipeThresholdVelocity;
-	public static int displayHeight;
-	public static int displayWidth;
-
-	public static boolean isTablet = false;
 	private boolean scheduledRestart = false;
-	public static int sFragmentAnimationDirection = 0;
+	private AsyncTask<Void, Void, Void> refreshPrefTask;
+	private Integer sizeVerticalCategory;
+	private Integer sizeHorizontalCategory;
 
 	// Singleton (see http://stackoverflow.com/a/11165926)
 	private Controller() {
 	}
 
-	private static class InstanceHolder {
-		private static final Controller instance = new Controller();
-	}
-
 	public static Controller getInstance() {
 		return InstanceHolder.instance;
+	}
+
+	@SuppressLint("PackageManagerGetSignatures")
+	public static boolean checkRightAppSignature(Context context) {
+		try {
+			PackageInfo packageInfo = context.getPackageManager()
+					.getPackageInfo(context.getPackageName(), PackageManager.GET_SIGNATURES);
+			for (Signature signature : packageInfo.signatures) {
+				MessageDigest md = MessageDigest.getInstance("SHA");
+				md.update(signature.toByteArray());
+				final String currentSignature = Base64.encodeToString(md.digest(), Base64.NO_WRAP).replace("\r", "")
+						.replace("\n", "");
+				if (SIGNATURE.equals(currentSignature)) return true;
+			}
+		} catch (Exception e) {
+			Log.w(TAG, "Signing key could not be determined, assuming wrong key.");
+		}
+		return false;
+	}
+
+	// ******* CONNECTION-Options ****************************
+
+	public static boolean checkRightInstaller(final Context context) {
+		final String installer = context.getPackageManager().getInstallerPackageName(context.getPackageName());
+		return installer != null && installer.startsWith(PLAY_STORE_APP_ID);
+	}
+
+	public static boolean checkNoEmulator() {
+		return !("google_sdk".equals(Build.PRODUCT) || "sdk".equals(Build.PRODUCT) || "sdk_x86".equals(Build.PRODUCT)
+				|| "vbox86p".equals(Build.PRODUCT));
+	}
+
+	public static boolean checkDebuggableDisabled(final Context context) {
+		return (context.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0;
+	}
+
+	public static void refreshDisplayMetrics(Display display) {
+		if (display == null) return;
+
+		DisplayMetrics dm = new DisplayMetrics();
+		display.getMetrics(dm);
+
+		int SWIPE_MIN_DISTANCE = 120;
+		int SWIPE_MAX_OFF_PATH = 250;
+		int SWIPE_THRESHOLD_VELOCITY = 220;
+
+		relSwipeMinDistance = (int) (SWIPE_MIN_DISTANCE * dm.densityDpi / 160.0f);
+		relSwipeMaxOffPath = (int) (SWIPE_MAX_OFF_PATH * dm.densityDpi / 160.0f);
+		relSwipeThresholdVelocity = (int) (SWIPE_THRESHOLD_VELOCITY * dm.densityDpi / 160.0f);
+		displayHeight = dm.heightPixels;
+		displayWidth = dm.widthPixels;
+	}
+
+	private static String getCurrentSSID(WifiManager wifiManager) {
+		if (wifiManager != null && wifiManager.isWifiEnabled()) {
+			WifiInfo info = wifiManager.getConnectionInfo();
+			final String ssid = info.getSSID();
+			return ssid == null ? "" : ssid.replace("\"", "");
+		} else {
+			return null;
+		}
+	}
+
+	private static String getStringWithSSID(String param, String wifiSSID, boolean wifibasedPrefsEnabled) {
+		if (wifiSSID == null || !wifibasedPrefsEnabled) return param;
+		else return wifiSSID + param;
+	}
+
+	private static String getKeyCategoryFeedId(FeedHeadlineActivity activity) {
+		return "_" + activity.getFeedId() + " " + activity.getCategoryId();
 	}
 
 	public void initialize(final Context context) {
@@ -265,38 +329,6 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		}
 	}
 
-	@SuppressLint("PackageManagerGetSignatures")
-	public static boolean checkRightAppSignature(Context context) {
-		try {
-			PackageInfo packageInfo = context.getPackageManager()
-					.getPackageInfo(context.getPackageName(), PackageManager.GET_SIGNATURES);
-			for (Signature signature : packageInfo.signatures) {
-				MessageDigest md = MessageDigest.getInstance("SHA");
-				md.update(signature.toByteArray());
-				final String currentSignature = Base64.encodeToString(md.digest(), Base64.NO_WRAP).replace("\r", "")
-						.replace("\n", "");
-				if (SIGNATURE.equals(currentSignature)) return true;
-			}
-		} catch (Exception e) {
-			Log.w(TAG, "Signing key could not be determined, assuming wrong key.");
-		}
-		return false;
-	}
-
-	public static boolean checkRightInstaller(final Context context) {
-		final String installer = context.getPackageManager().getInstallerPackageName(context.getPackageName());
-		return installer != null && installer.startsWith(PLAY_STORE_APP_ID);
-	}
-
-	public static boolean checkNoEmulator() {
-		return !("google_sdk".equals(Build.PRODUCT) || "sdk".equals(Build.PRODUCT) || "sdk_x86".equals(Build.PRODUCT)
-				|| "vbox86p".equals(Build.PRODUCT));
-	}
-
-	public static boolean checkDebuggableDisabled(final Context context) {
-		return (context.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0;
-	}
-
 	/**
 	 * Enables HTTP response caching, see http://android-developers.blogspot.de/2011/09/androids-http-clients.html
 	 */
@@ -310,25 +342,6 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		}
 	}
 
-	public static void refreshDisplayMetrics(Display display) {
-		if (display == null) return;
-
-		DisplayMetrics dm = new DisplayMetrics();
-		display.getMetrics(dm);
-
-		int SWIPE_MIN_DISTANCE = 120;
-		int SWIPE_MAX_OFF_PATH = 250;
-		int SWIPE_THRESHOLD_VELOCITY = 220;
-
-		relSwipeMinDistance = (int) (SWIPE_MIN_DISTANCE * dm.densityDpi / 160.0f);
-		relSwipeMaxOffPath = (int) (SWIPE_MAX_OFF_PATH * dm.densityDpi / 160.0f);
-		relSwipeThresholdVelocity = (int) (SWIPE_THRESHOLD_VELOCITY * dm.densityDpi / 160.0f);
-		displayHeight = dm.heightPixels;
-		displayWidth = dm.widthPixels;
-	}
-
-	// ******* CONNECTION-Options ****************************
-
 	private boolean wifibasedPrefsEnabled() {
 		// Load from Wifi-Preferences:
 		String key = getStringWithSSID(ENABLE_WIFI_BASED_SUFFIX, getCurrentSSID(wifiManager), true);
@@ -341,6 +354,10 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 
 	public URL url() throws MalformedURLException {
 		return new URL(hostname());
+	}
+
+	public Uri.Builder uriBuilder() {
+		return Uri.parse(hostname()).buildUpon();
 	}
 
 	public String hostname() {
@@ -454,6 +471,8 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		else return prefs.getString(KEYSTORE_PASSWORD, EMPTY);
 	}
 
+	// ******* USAGE-Options ****************************
+
 	public boolean urlNeedsAuthentication(URL url) {
 		if (!this.useHttpAuth()) return false;
 
@@ -515,6 +534,17 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		return imageCache;
 	}
 
+	public IconCache getIconCache() {
+		// Just try to load the cache once
+		if (iconCacheLoaded.compareAndSet(false, true)) {
+			IconCache iconCache = new IconCache();
+			if (iconCache.isDiskCacheEnabled()) {
+				this.iconCache = iconCache;
+			}
+		}
+		return this.iconCache;
+	}
+
 	public boolean isHeadless() {
 		return isHeadless;
 	}
@@ -533,8 +563,6 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		put(IGNORE_UNSAFE_CONNECTION_ERROR, true);
 		this.ignoreUnsafeConnectionError = ignoreUnsafeConnectionError;
 	}
-
-	// ******* USAGE-Options ****************************
 
 	public boolean openUrlEmptyArticle() {
 		if (openUrlEmptyArticle == null)
@@ -584,6 +612,8 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 			workOffline = prefs.getBoolean(WORK_OFFLINE, Constants.WORK_OFFLINE_DEFAULT);
 		return workOffline;
 	}
+
+	// ******* DISPLAY-Options ****************************
 
 	public void setWorkOffline(boolean workOffline) {
 		put(WORK_OFFLINE, workOffline);
@@ -635,8 +665,6 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 
 		return hideFeedReadButtons;
 	}
-
-	// ******* DISPLAY-Options ****************************
 
 	public boolean animations() {
 		if (animations == null) animations = prefs.getBoolean(ANIMATIONS, ANIMATIONS_DEFAULT);
@@ -800,6 +828,8 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		return timeString;
 	}
 
+	// SYSTEM
+
 	public void setTimeString(String timeString) {
 		put(TIME_STRING, timeString);
 		this.timeString = timeString;
@@ -830,14 +860,14 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		}
 	}
 
-	private int getThemeInternal() {
-		if (theme == null) theme = Integer.parseInt(prefs.getString(THEME, THEME_DEFAULT));
-		return theme;
-	}
-
 	public void setTheme(int theme) {
 		this.theme = theme;
 		put(THEME, theme + "");
+	}
+
+	private int getThemeInternal() {
+		if (theme == null) theme = Integer.parseInt(prefs.getString(THEME, THEME_DEFAULT));
+		return theme;
 	}
 
 	public int getThemeHTML() {
@@ -861,8 +891,6 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 	public void setScheduledRestart(boolean scheduledRestart) {
 		this.scheduledRestart = scheduledRestart;
 	}
-
-	// SYSTEM
 
 	public String saveAttachmentPath() {
 		if (saveAttachment == null)
@@ -931,6 +959,8 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		this.deleteDbScheduled = isDeleteDBScheduled;
 	}
 
+	// ******* INTERNAL Data ****************************
+
 	public boolean cacheImagesOnStartup() {
 		if (cacheImagesOnStartup == null)
 			cacheImagesOnStartup = prefs.getBoolean(CACHE_IMAGES_ON_STARTUP, CACHE_IMAGES_ON_STARTUP_DEFAULT);
@@ -982,8 +1012,6 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		put(NO_CRASHREPORTS_UNTIL_UPDATE, noCrashreportsUntilUpdate);
 		this.noCrashreportsUntilUpdate = noCrashreportsUntilUpdate;
 	}
-
-	// ******* INTERNAL Data ****************************
 
 	public boolean isValidInstallation() {
 		return validInstallation;
@@ -1046,11 +1074,6 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		// this.isFirstRun = isFirstRun;
 	}
 
-	public void setSinceId(int sinceId) {
-		put(SINCE_ID, sinceId);
-		this.sinceId = sinceId;
-	}
-
 	public int getSinceId() {
 		if (sinceId == null) {
 			try {
@@ -1063,14 +1086,19 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		return sinceId;
 	}
 
-	public void setLastSync(long lastSync) {
-		put(LAST_SYNC, lastSync);
-		this.lastSync = lastSync;
+	public void setSinceId(int sinceId) {
+		put(SINCE_ID, sinceId);
+		this.sinceId = sinceId;
 	}
 
 	public long getLastSync() {
 		if (lastSync == null) lastSync = prefs.getLong(LAST_SYNC, LAST_SYNC_DEFAULT);
 		return lastSync;
+	}
+
+	public void setLastSync(long lastSync) {
+		put(LAST_SYNC, lastSync);
+		this.lastSync = lastSync;
 	}
 
 	public void lowMemory(boolean lowMemory) {
@@ -1083,17 +1111,15 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		return lowMemory;
 	}
 
-	public void setLastCleanup(long lastCleanup) {
-		put(LAST_CLEANUP, lastCleanup);
-		this.lastCleanup = lastSync;
-	}
-
 	public long getLastCleanup() {
 		if (lastCleanup == null) lastCleanup = prefs.getLong(LAST_CLEANUP, LAST_CLEANUP_DEFAULT);
 		return lastCleanup;
 	}
 
-	private AsyncTask<Void, Void, Void> refreshPrefTask;
+	public void setLastCleanup(long lastCleanup) {
+		put(LAST_CLEANUP, lastCleanup);
+		this.lastCleanup = lastSync;
+	}
 
 	public long getFreshArticleMaxAge() {
 		if (freshArticleMaxAge == null)
@@ -1203,28 +1229,6 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		Controller.preferencesChanged = preferencesChanged;
 	}
 
-	private static String getCurrentSSID(WifiManager wifiManager) {
-		if (wifiManager != null && wifiManager.isWifiEnabled()) {
-			WifiInfo info = wifiManager.getConnectionInfo();
-			final String ssid = info.getSSID();
-			return ssid == null ? "" : ssid.replace("\"", "");
-		} else {
-			return null;
-		}
-	}
-
-	private static String getStringWithSSID(String param, String wifiSSID, boolean wifibasedPrefsEnabled) {
-		if (wifiSSID == null || !wifibasedPrefsEnabled) return param;
-		else return wifiSSID + param;
-	}
-
-	private static final String SIZE_VERTICAL_CATEGORY = "sizeVerticalCategory";
-	private static final String SIZE_HORIZONTAL_CATEGORY = "sizeHorizontalCategory";
-	private static final String SIZE_VERTICAL_HEADLINE = "sizeVerticalHeadline";
-	private static final String SIZE_HORIZONTAL_HEADLINE = "sizeHorizontalHeadline";
-	private Integer sizeVerticalCategory;
-	private Integer sizeHorizontalCategory;
-
 	public int getMainFrameSize(MenuActivity activity, boolean isVertical, int min, int max) {
 		int ret = -1;
 		if (activity instanceof CategoryActivity) {
@@ -1267,8 +1271,16 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		}
 	}
 
-	private static String getKeyCategoryFeedId(FeedHeadlineActivity activity) {
-		return "_" + activity.getFeedId() + " " + activity.getCategoryId();
+	public void subscribe(NetworkChangeSubscriber subscriber) {
+		this.networkStateBroadcastReceiver.subscribe(subscriber);
+	}
+
+	public void unsubscribe(NetworkChangeSubscriber subscriber) {
+		this.networkStateBroadcastReceiver.unsubscribe(subscriber);
+	}
+
+	private static class InstanceHolder {
+		private static final Controller instance = new Controller();
 	}
 
 }
