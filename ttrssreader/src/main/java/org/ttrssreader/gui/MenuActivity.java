@@ -17,6 +17,27 @@
 
 package org.ttrssreader.gui;
 
+import org.ttrssreader.R;
+import org.ttrssreader.controllers.Controller;
+import org.ttrssreader.controllers.DBHelper;
+import org.ttrssreader.controllers.ProgressBarManager;
+import org.ttrssreader.controllers.UpdateController;
+import org.ttrssreader.gui.dialogs.ErrorDialog;
+import org.ttrssreader.gui.dialogs.YesNoUpdaterDialog;
+import org.ttrssreader.gui.interfaces.ICacheEndListener;
+import org.ttrssreader.gui.interfaces.IDataChangedListener;
+import org.ttrssreader.gui.interfaces.IItemSelectedListener;
+import org.ttrssreader.gui.interfaces.IUpdateEndListener;
+import org.ttrssreader.imageCache.ForegroundService;
+import org.ttrssreader.model.updaters.IUpdatable;
+import org.ttrssreader.model.updaters.StateSynchronisationUpdater;
+import org.ttrssreader.model.updaters.Updater;
+import org.ttrssreader.networkchange.NetworkStateBroadcastReceiver;
+import org.ttrssreader.preferences.Constants;
+import org.ttrssreader.utils.AsyncTask;
+import org.ttrssreader.utils.PostMortemReportExceptionHandler;
+import org.ttrssreader.utils.Utils;
+
 import android.app.FragmentManager;
 import android.content.Context;
 import android.content.Intent;
@@ -40,27 +61,6 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.ttrssreader.R;
-import org.ttrssreader.controllers.Controller;
-import org.ttrssreader.controllers.DBHelper;
-import org.ttrssreader.controllers.ProgressBarManager;
-import org.ttrssreader.controllers.UpdateController;
-import org.ttrssreader.gui.dialogs.ErrorDialog;
-import org.ttrssreader.gui.dialogs.YesNoUpdaterDialog;
-import org.ttrssreader.gui.interfaces.ICacheEndListener;
-import org.ttrssreader.gui.interfaces.IDataChangedListener;
-import org.ttrssreader.gui.interfaces.IItemSelectedListener;
-import org.ttrssreader.gui.interfaces.IUpdateEndListener;
-import org.ttrssreader.imageCache.ForegroundService;
-import org.ttrssreader.model.updaters.IUpdatable;
-import org.ttrssreader.model.updaters.StateSynchronisationUpdater;
-import org.ttrssreader.model.updaters.Updater;
-import org.ttrssreader.networkchange.NetworkStateBroadcastReceiver;
-import org.ttrssreader.preferences.Constants;
-import org.ttrssreader.utils.AsyncTask;
-import org.ttrssreader.utils.PostMortemReportExceptionHandler;
-import org.ttrssreader.utils.Utils;
-
 /**
  * This class provides common functionality for Activities.
  */
@@ -70,53 +70,28 @@ public abstract class MenuActivity extends MenuFlavorActivity
 	@SuppressWarnings("unused")
 	private static final String TAG = MenuActivity.class.getSimpleName();
 
+	private PostMortemReportExceptionHandler mDamageReport = new PostMortemReportExceptionHandler(this);
+
 	private static final NetworkStateBroadcastReceiver NETWORK_STATE_BROADCAST_RECEIVER = new NetworkStateBroadcastReceiver();
-	// The "active pointer" is the one currently moving our object.
-	private static final int INVALID_POINTER_ID = -1;
-	private static int minSize;
-	private static int maxSize;
+
 	protected MenuActivity activity;
 	protected volatile boolean mOnSaveInstanceStateCalled = false;
-	private PostMortemReportExceptionHandler mDamageReport = new PostMortemReportExceptionHandler(this);
+
 	private Updater updater;
 	private boolean isVertical;
+	private static int minSize;
+	private static int maxSize;
 	private int dividerSize;
 	private int displaySize;
+
 	private View frameMain = null;
 	private View divider = null;
 	private View frameSub = null;
 	private TextView header_title;
 	private TextView header_unread;
+
 	private ProgressBar progressbar;
 	private ProgressBar progressspinner;
-	private int mActivePointerId = INVALID_POINTER_ID;
-	private float mLastTouchX = 0;
-	private float mLastTouchY = 0;
-	private int mDeltaX = 0;
-	private int mDeltaY = 0;
-	private boolean resizing = false;
-
-	private static View findViewAtPosition(View parent, int x, int y) {
-		if (parent instanceof ViewGroup) {
-			ViewGroup viewGroup = (ViewGroup) parent;
-			for (int i = 0; i < viewGroup.getChildCount(); i++) {
-				View child = viewGroup.getChildAt(i);
-				View viewAtPosition = findViewAtPosition(child, x, y);
-				if (viewAtPosition != null) {
-					return viewAtPosition;
-				}
-			}
-			return null;
-		} else {
-			Rect rect = new Rect();
-			parent.getGlobalVisibleRect(rect);
-			if (rect.contains(x, y)) {
-				return parent;
-			} else {
-				return null;
-			}
-		}
-	}
 
 	@Override
 	protected void onCreate(Bundle instance) {
@@ -470,8 +445,6 @@ public abstract class MenuActivity extends MenuFlavorActivity
 		if (goBackAfterUpdate && !isFinishing()) onBackPressed();
 	}
 
-	/* ############# END: Cache */
-
 	protected void doStopImageCache() {
 		ForegroundService.cancel();
 		invalidateOptionsMenu();
@@ -494,6 +467,19 @@ public abstract class MenuActivity extends MenuFlavorActivity
 			case Utils.NETWORK_WIFI:
 				doCache(Utils.NETWORK_WIFI);
 				break;
+		}
+	}
+
+	private class ImageCacheUpdater implements IUpdatable {
+		int networkState;
+
+		public ImageCacheUpdater(int networkState) {
+			this.networkState = networkState;
+		}
+
+		@Override
+		public void update() {
+			doCache(networkState);
 		}
 	}
 
@@ -537,6 +523,8 @@ public abstract class MenuActivity extends MenuFlavorActivity
 		return ForegroundService.isInstanceCreated();
 	}
 
+	/* ############# END: Cache */
+
 	protected void openConnectionErrorDialog(String errorMessage) {
 		if (updater != null) {
 			updater.cancel(true);
@@ -578,6 +566,40 @@ public abstract class MenuActivity extends MenuFlavorActivity
 	}
 
 	protected abstract void doUpdate(boolean forceUpdate);
+
+	/**
+	 * Can be used in child activities to update their data and get a UI refresh afterwards.
+	 */
+	abstract class ActivityUpdater extends AsyncTask<Void, Integer, Void> {
+		protected int taskCount = 0;
+		protected boolean forceUpdate;
+
+		ActivityUpdater(boolean forceUpdate) {
+			this.forceUpdate = forceUpdate;
+			ProgressBarManager.getInstance().addProgress(activity);
+		}
+
+		@Override
+		protected void onProgressUpdate(Integer... values) {
+			if (values[0] == Integer.MAX_VALUE) {
+				if (!isCacherRunning()) ProgressBarManager.getInstance().removeProgress(activity);
+				return;
+			}
+			// Add 500 to make sure we are still within 10000 but never show an empty progressbar at 0
+			setSupportProgress((10000 / (taskCount + 1)) * values[0] + 500);
+		}
+	}
+
+	// The "active pointer" is the one currently moving our object.
+	private static final int INVALID_POINTER_ID = -1;
+	private int mActivePointerId = INVALID_POINTER_ID;
+
+	private float mLastTouchX = 0;
+	private float mLastTouchY = 0;
+	private int mDeltaX = 0;
+	private int mDeltaY = 0;
+
+	private boolean resizing = false;
 
 	@Override
 	public boolean onTouchEvent(MotionEvent ev) {
@@ -652,6 +674,28 @@ public abstract class MenuActivity extends MenuFlavorActivity
 		Controller.getInstance().setViewSize(this, isVertical, size);
 	}
 
+	private static View findViewAtPosition(View parent, int x, int y) {
+		if (parent instanceof ViewGroup) {
+			ViewGroup viewGroup = (ViewGroup) parent;
+			for (int i = 0; i < viewGroup.getChildCount(); i++) {
+				View child = viewGroup.getChildAt(i);
+				View viewAtPosition = findViewAtPosition(child, x, y);
+				if (viewAtPosition != null) {
+					return viewAtPosition;
+				}
+			}
+			return null;
+		} else {
+			Rect rect = new Rect();
+			parent.getGlobalVisibleRect(rect);
+			if (rect.contains(x, y)) {
+				return parent;
+			} else {
+				return null;
+			}
+		}
+	}
+
 	@Override
 	public void setSupportProgress(int progress) {
 		setSupportProgressBarVisibility(progress > 1 && progress < 9999);
@@ -669,42 +713,6 @@ public abstract class MenuActivity extends MenuFlavorActivity
 	public void setSupportProgressBarIndeterminateVisibility(boolean visible) {
 		progressspinner.setVisibility(visible ? View.VISIBLE : View.GONE);
 		super.setSupportProgressBarIndeterminateVisibility(visible);
-	}
-
-	private class ImageCacheUpdater implements IUpdatable {
-		int networkState;
-
-		public ImageCacheUpdater(int networkState) {
-			this.networkState = networkState;
-		}
-
-		@Override
-		public void update() {
-			doCache(networkState);
-		}
-	}
-
-	/**
-	 * Can be used in child activities to update their data and get a UI refresh afterwards.
-	 */
-	abstract class ActivityUpdater extends AsyncTask<Void, Integer, Void> {
-		protected int taskCount = 0;
-		protected boolean forceUpdate;
-
-		ActivityUpdater(boolean forceUpdate) {
-			this.forceUpdate = forceUpdate;
-			ProgressBarManager.getInstance().addProgress(activity);
-		}
-
-		@Override
-		protected void onProgressUpdate(Integer... values) {
-			if (values[0] == Integer.MAX_VALUE) {
-				if (!isCacherRunning()) ProgressBarManager.getInstance().removeProgress(activity);
-				return;
-			}
-			// Add 500 to make sure we are still within 10000 but never show an empty progressbar at 0
-			setSupportProgress((10000 / (taskCount + 1)) * values[0] + 500);
-		}
 	}
 
 }

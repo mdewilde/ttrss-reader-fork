@@ -48,7 +48,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.InterruptedIOException;
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
 import java.net.Authenticator;
 import java.net.HttpURLConnection;
@@ -68,7 +67,10 @@ import javax.net.ssl.SSLPeerUnverifiedException;
 
 public class JSONConnector {
 
+	private static final Gson GSON = new Gson();
+
 	public static final int PARAM_LIMIT_MAX_VALUE = 200;
+
 	// session id as an IN parameter
 	protected static final String SID = "sid";
 	private static final String TAG = JSONConnector.class.getSimpleName();
@@ -127,13 +129,53 @@ public class JSONConnector {
 	protected static String lastError = "";
 	protected static boolean hasLastError = false;
 	private final Object lock = new Object();
-	protected boolean httpAuth = false;
-	protected String httpUsername;
-	protected String httpPassword;
-	protected String base64NameAndPw = null;
+
+	private String base64NameAndPassword = null;
+
 	protected String sessionId = null;
 	private int apiLevel = -1;
 	private long noTaskUntil = 0;
+
+	public JSONConnector() {
+		initHttpAuthentication();
+	}
+
+	private void initHttpAuthentication() {
+
+		if (!Controller.getInstance().useHttpAuth()) {
+			this.base64NameAndPassword = null;
+			return;
+		}
+
+		String user = Controller.getInstance().httpUsername();
+		String pass = Controller.getInstance().httpPassword();
+
+		/*
+
+			curl -u  -d '{"op":"login","user":"test","password":"t3st3r!"}' https://r.zaan.be/api/
+			curl -u sandstorm:RIt7H6ZT1CsZmu9Mt6zHcMucYK7wqEDsaKpRtJMYGbl -d '{"op":"login"}' https://api-1afaa57ac327a243e9e49e045113fbe6.oasis.sandstorm.io/api
+
+		*/
+
+		byte[] credentials = new StringBuilder()
+				.append(user)
+				.append(':')
+				.append(pass)
+				.toString()
+				.getBytes(StandardCharsets.UTF_8);
+
+		this.base64NameAndPassword = Base64.encodeToString(credentials, Base64.NO_WRAP);
+
+		// PasswordAuthentication JavaDoc claims its instances are immutable
+		final PasswordAuthentication passwordAuthentication = new PasswordAuthentication(user, pass.toCharArray());
+
+		Authenticator.setDefault(new Authenticator() {
+			public PasswordAuthentication getPasswordAuthentication() {
+				return passwordAuthentication;
+			}
+		});
+
+	}
 
 	protected static String formatException(Exception e) {
 		return e.getMessage() + (e.getCause() != null ? "(" + e.getCause() + ")" : "");
@@ -141,7 +183,9 @@ public class JSONConnector {
 
 	private InputStream doRequest(Map<String, String> params) {
 		try {
-			if (sessionId != null) params.put(SID, sessionId);
+			if (sessionId != null) {
+				params.put(SID, sessionId);
+			}
 
 			JSONObject json = new JSONObject(params);
 			byte[] outputBytes = json.toString().getBytes("UTF-8");
@@ -149,6 +193,10 @@ public class JSONConnector {
 			logRequest(json);
 
 			URL url = Controller.getInstance().url();
+
+			// TODO TEST CODE REMOVE
+//			url = new URL("https://api-1afaa57ac327a243e9e49e045113fbe6.oasis.sandstorm.io/");
+
 			HttpURLConnection con = (HttpURLConnection) url.openConnection(Proxy.NO_PROXY);
 			con.setDoInput(true);
 			con.setDoOutput(true);
@@ -165,8 +213,9 @@ public class JSONConnector {
 			con.setConnectTimeout((int) (8 * Utils.SECOND));
 
 			// HTTP-Basic Authentication
-			if (base64NameAndPw != null)
-				con.setRequestProperty("Authorization", "Basic " + base64NameAndPw);
+			if (base64NameAndPassword != null) {
+				con.setRequestProperty("Authorization", "Basic " + base64NameAndPassword);
+			}
 
 			// Add POST data
 			con.getOutputStream().write(outputBytes);
@@ -209,33 +258,7 @@ public class JSONConnector {
 		return null;
 	}
 
-	public void init() {
-		httpAuth = Controller.getInstance().useHttpAuth();
-		if (!httpAuth) return;
-
-		if (httpUsername != null) return;
-		if (httpPassword != null) return;
-
-		// Refresh data
-		httpUsername = Controller.getInstance().httpUsername();
-		httpPassword = Controller.getInstance().httpPassword();
-
-		if (!httpAuth) return;
-
-		try {
-			base64NameAndPw = Base64
-					.encodeToString((httpUsername + ":" + httpPassword).getBytes("UTF-8"), Base64.NO_WRAP);
-		} catch (UnsupportedEncodingException e) {
-			base64NameAndPw = null;
-		}
-		Authenticator.setDefault(new Authenticator() {
-			protected PasswordAuthentication getPasswordAuthentication() {
-				return new PasswordAuthentication(httpUsername, httpPassword.toCharArray());
-			}
-		});
-	}
-
-	protected void logRequest(final JSONObject json) throws JSONException {
+	private void logRequest(final JSONObject json) throws JSONException {
 		// Filter password and session-id
 		Object paramPw = json.remove(PARAM_PW);
 		Object paramSID = json.remove(SID);
@@ -456,36 +479,32 @@ public class JSONConnector {
 		if (sessionId != null && !lastError.equals(NOT_LOGGED_IN)) return true;
 
 		synchronized (lock) {
+			if (sessionId != null && !lastError.equals(NOT_LOGGED_IN)) {
+				return true; // Login done while we were waiting for the lock
+			}
+
+			String user = Controller.getInstance().username();
+			String password = Base64.encodeToString(Controller.getInstance().password().getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
+
+			Map<String, String> params = RequestFactory.newLoginRequest(Controller.getInstance().username(), password);
+
 			try {
-				if (sessionId != null && !lastError.equals(NOT_LOGGED_IN))
-					return true; // Login done while we were waiting for the lock
-
-				Map<String, String> params = RequestFactory.newLoginRequest();
-				params.put(PARAM_USER, Controller.getInstance().username());
-				params.put(PARAM_PW,
-						Base64.encodeToString(Controller.getInstance().password().getBytes("UTF-8"), Base64.NO_WRAP));
-
-				try {
-					sessionId = readResult(params, true, false);
-					if (sessionId != null) {
-						Log.d(TAG, "login: " + (System.currentTimeMillis() - time) + "ms");
-						return true;
-					}
-				} catch (IOException e) {
-					if (!hasLastError) {
-						hasLastError = true;
-						lastError = formatException(e);
-					}
+				sessionId = readResult(params, true, false);
+				if (sessionId != null) {
+					Log.d(TAG, "login: " + (System.currentTimeMillis() - time) + "ms");
+					return true;
 				}
-
+			} catch (IOException e) {
 				if (!hasLastError) {
-					// Login didnt succeed, write message
 					hasLastError = true;
-					lastError = MyApplication.context().getString(R.string.Error_NotLoggedIn);
+					lastError = formatException(e);
 				}
-			} catch (UnsupportedEncodingException e) {
+			}
+
+			if (!hasLastError) {
+				// Login didnt succeed, write message
 				hasLastError = true;
-				lastError = MyApplication.context().getString(R.string.Error_EncodePassword);
+				lastError = MyApplication.context().getString(R.string.Error_NotLoggedIn);
 			}
 			return false;
 		}
@@ -782,9 +801,12 @@ public class JSONConnector {
 				return null;
 			}
 
-			Type fooType = new TypeToken<TTRSSResponse<Config>>() {
-			}.getType();
-			TTRSSResponse<Config> response = new Gson().fromJson(new InputStreamReader(in, StandardCharsets.UTF_8), fooType);
+			Type getConfigResponseType = new TypeToken<TTRSSResponse<Config>>() {}.getType();
+
+			TTRSSResponse<Config> response = GSON.fromJson(new InputStreamReader(in, StandardCharsets.UTF_8), getConfigResponseType);
+
+			Log.d(TAG, "getConfig() response " + response);
+
 			if (response != null) {
 				return response.content;
 			} else {

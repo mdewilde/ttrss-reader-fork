@@ -45,16 +45,6 @@ public class ImageCache {
 		this.isDiskCacheEnabled = this.diskCacheDir != null;
 	}
 
-	/**
-	 * create uniq string from file url, which can be used as file name
-	 *
-	 * @param imageUrl URL of given image
-	 * @return calculated hash
-	 */
-	public static String getHashForKey(String imageUrl) {
-		return imageUrl.replaceAll("[:;#~%$\"!<>|+*\\()^/,?&=]+", "+");
-	}
-
 	public boolean isDiskCacheEnabled() {
 		return isDiskCacheEnabled;
 	}
@@ -78,6 +68,16 @@ public class ImageCache {
 
 	boolean containsKey(String key) {
 		return cache.contains(getFileNameForKey(key)) || isDiskCacheEnabled && getCacheFile(key).exists();
+	}
+
+	/**
+	 * create uniq string from file url, which can be used as file name
+	 *
+	 * @param imageUrl URL of given image
+	 * @return calculated hash
+	 */
+	public static String getHashForKey(String imageUrl) {
+		return imageUrl.replaceAll("[:;#~%$\"!<>|+*\\()^/,?&=]+", "+");
 	}
 
 	private String getFileNameForKey(String imageUrl) {

@@ -6,4 +6,13 @@ public class TTRSSResponse<T> {
 	public int status;
 	public T content;
 
+	@Override
+	public String toString() {
+		return "TTRSSResponse{" +
+				"content=" + content +
+				", seq=" + seq +
+				", status=" + status +
+				'}';
+	}
+
 }

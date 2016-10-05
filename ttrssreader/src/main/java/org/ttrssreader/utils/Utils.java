@@ -52,6 +52,7 @@ import java.net.Proxy;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -329,7 +330,7 @@ public class Utils {
 	}
 
 	/**
-	 * Reads a file from my webserver and parses the content. It containts the version code of the latest supported
+	 * Reads a file from my webserver and parses the content. It contains the version code of the latest supported
 	 * version. If the version of the installed app is lower then this the feature "Send mail with stacktrace on error"
 	 * will be disabled to make sure I only receive "new" Bugreports.
 	 */
@@ -350,7 +351,7 @@ public class Utils {
 
 				if (code < 400 || code >= 600) {
 
-					BufferedReader br = new BufferedReader(new InputStreamReader(con.getInputStream()));
+					BufferedReader br = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8));
 					String content = br.readLine(); // Just read one line!
 
 					// Only ever read the integer if it matches the regex and is not too long

@@ -11,9 +11,11 @@ public class RequestFactory {
 		return map;
 	}
 
-	public static Map<String, String> newLoginRequest() {
+	public static Map<String, String> newLoginRequest(String user, String password) {
 		Map<String, String> map = new HashMap<>();
 		map.put("op", "login");
+		map.put("user", user);
+		map.put("password", password);
 		return map;
 	}
 

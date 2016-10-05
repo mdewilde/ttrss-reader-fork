@@ -20,6 +20,7 @@ package org.ttrssreader.model;
 
 import android.content.Context;
 import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.graphics.Typeface;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,7 +28,10 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import org.ttrssreader.R;
+import org.ttrssreader.controllers.Controller;
 import org.ttrssreader.model.pojos.Feed;
+
+import java.util.List;
 
 public class FeedAdapter extends MainAdapter {
 
@@ -79,7 +83,14 @@ public class FeedAdapter extends MainAdapter {
 
 		final Feed f = getFeed(cursor);
 
-		holder.icon.setImageResource(getImage(f.unread > 0));
+		Bitmap bitmap = Controller.getInstance().getIconCache().getImage(f.id);
+
+		if (bitmap != null) {
+			holder.icon.setImageBitmap(bitmap);
+		} else {
+			holder.icon.setImageResource(getImage(f.unread > 0));
+		}
+
 		holder.title.setText(formatItemTitle(f.title, f.unread));
 		if (f.unread > 0) holder.title.setTypeface(Typeface.DEFAULT_BOLD);
 		else holder.title.setTypeface(Typeface.DEFAULT);

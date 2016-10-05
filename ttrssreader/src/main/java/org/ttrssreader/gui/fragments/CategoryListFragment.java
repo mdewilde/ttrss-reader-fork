@@ -153,8 +153,7 @@ public class CategoryListFragment extends MainListFragment {
 	@Override
 	public Loader<Cursor> onCreateLoader(int id, Bundle args) {
 		if (id == TYPE_CAT_ID) {
-			Builder builder = ListContentProvider.CONTENT_URI_CAT.buildUpon();
-			categoryUri = builder.build();
+			categoryUri = ListContentProvider.CONTENT_URI_CAT;
 			return new CursorLoader(getActivity(), categoryUri, null, null, null, null);
 		}
 		return null;
