@@ -74,8 +74,7 @@ public class DateUtils {
 
 	/**
 	 * Returns the formatted date in the format specified by Controller.dateString() or if settings indicate the
-	 * systems
-	 * configuration should be used it returns the date formatted as specified by the system.
+	 * systems configuration should be used it returns the date formatted as specified by the system.
 	 *
 	 * @param context  the application context
 	 * @param dateTime the date to be formatted

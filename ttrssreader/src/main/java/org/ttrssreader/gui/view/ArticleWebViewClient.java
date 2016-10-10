@@ -30,6 +30,8 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import com.orhanobut.logger.Logger;
+
 import org.ttrssreader.MyApplication;
 import org.ttrssreader.R;
 import org.ttrssreader.controllers.Controller;
@@ -104,7 +106,7 @@ public class ArticleWebViewClient extends WebViewClient {
 								new AsyncMediaDownloader(context)
 										.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, new URL(url));
 							} catch (MalformedURLException e) {
-								e.printStackTrace();
+								Logger.e(TAG, e);
 							}
 							break;
 						case 2:
@@ -129,7 +131,7 @@ public class ArticleWebViewClient extends WebViewClient {
 				intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 				context.startActivity(intent);
 			} catch (Exception e) {
-				e.printStackTrace();
+				Logger.e(TAG, e);
 			}
 		}
 

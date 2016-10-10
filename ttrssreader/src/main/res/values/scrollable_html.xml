@@ -17,8 +17,8 @@
   -->
 <resources>
 
-	<!-- MAIN TEMPLATE -->
-	<string name="HTML_TEMPLATE" formatted="false" translatable="false">
+     <!-- MAIN TEMPLATE -->
+	<string name="HTML_TEMPLATE_SCROLLABLE" formatted="false" translatable="false">
 		<![CDATA[
 			<!DOCTYPE html>
 				<head>
@@ -55,18 +55,6 @@
 					$HYPHENATION$
 				</head>
 				<body id=\"$THEME$\" class=\"hyphenate\" lang=\"$LANGUAGE$\">
-					<div id=\"header\">
-						<a href=\"$article.url$\" rel=\"alternate\">$article.title$</a>
-						<div id=\"header_small_text\">
-							<div id=\"subscription\">$feed.title$</div>
-							<div id=\"datetime\">$UPDATED$</div>
-						</div>
-						<div id=\"author\">$article.author$</div>
-						<div id=\"labels\">$LABELS$</div>
-					</div>
-					<div id=\"zierleiste\"></div>
-					$NOTE_TEMPLATE$
-					<div id=\"zierleiste\"></div>
 					<div id=\"content\">$CONTENT$</div>
 					<div id=\"attachments\">$ATTACHMENTS$</div>
 					$NAVIGATION$
@@ -75,26 +63,8 @@
 		]]>
 	</string>
 
-
-	<!-- CHANGELOG TEMPLATE -->
-	<string name="HTML_TEMPLATE_CHANGELOG" formatted="false" translatable="false">
-<![CDATA[
-<!DOCTYPE html>
-<head>
-	<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />
-	$STYLE$
-</head>
-<body id=\"$THEME$\"></body>
-	<div id=\"content\">
-		<h1>$TITLE$</h1>
-		$CONTENT$
-	</div>
-</html>]]>
-	</string>
-
-
-	<!-- CSS -->
-	<string name="STYLE_TEMPLATE" formatted="false" translatable="false">
+    <!-- CSS -->
+	<string name="STYLE_TEMPLATE_SCROLLABLE" formatted="false" translatable="false">
 <![CDATA[
 <style type=\"text/css\">
 	body {
@@ -107,11 +77,7 @@
 	/************ BEGIN THEMES ************/
 	/*** THEME: DARK ***/
 	body#darkTheme {
-		background-color: #383838;
 		color: #CCC;
-	}
-	body#darkTheme #header {
-		background-color: #858585;
 	}
 	body#darkTheme a:link, a:active, a:hover {
 		color: #E1E1E1;
@@ -122,11 +88,7 @@
 
 	/*** THEME: LIGHT ***/
 	body#lightTheme {
-		background-color: #DED9D2;
 		color: #3A3931;
-	}
-	body#lightTheme #header {
-		background-color: #B7B7B7;
 	}
 	body#lightTheme a:link, a:active, a:hover {
 		color: #555;
@@ -137,11 +99,7 @@
 
 	/*** THEME: BLACK ***/
 	body#blackTheme {
-		background-color: #000;
 		color: #CCC;
-	}
-	body#blackTheme #header {
-		background-color: #858585;
 	}
 	body#blackTheme a:link, a:active, a:hover {
 		color: #E1E1E1;
@@ -152,11 +110,7 @@
 
 	/*** THEME: WHITE ***/
 	body#whiteTheme {
-		background-color: #FFF;
 		color: #3A3931;
-	}
-	body#whiteTheme #header {
-		background-color: #B7B7B7;
 	}
 	body#whiteTheme a:link, a:active, a:hover {
 		color: #555;
@@ -183,17 +137,6 @@
 	}
 	blockquote {
 		border-left: 2px solid #999;
-	}
-	#header {
-		font-size: 18px;
-		font-weight: bold;
-	}
-	#header a:link, a:active, a:hover, a:visited {
-		color: #FF0000;
-		text-decoration: none;
-	}
-	#header_small_text {
-		overflow: auto;
 	}
 	#note {
 		border: 2px dotted yellow;
@@ -226,58 +169,4 @@
 	}
 </style>]]>
 	</string>
-
-	<!-- HYPHENATION -->
-	<string name="JAVASCRIPT_HYPHENATION_TEMPLATE" formatted="false" translatable="false">
-<![CDATA[
-<script src=\"file:///android_asset/Hyphenator.js\" type=\"text/javascript\"></script>
-<script type=\"text/javascript\">Hyphenator.run();</script>
-<script type=\"text/javascript\" src=\"file:///android_asset/patterns/$LANGUAGE$.js\"></script>]]>
-	</string>
-
-	<!-- BOTTOM NAVIGATION -->
-	<string name="BOTTOM_NAVIGATION_TEMPLATE" formatted="false" translatable="false">
-<![CDATA[
-<style type=\"text/css\">
-	.bottom_navigation {
-		text-align: justify;
-	}
-	.bottom_navigation button {
-		display: block;
-		width: 40%;
-		font-size: 230%;
-	}
-	.bottom_navigation button.first {
-		float: left;
-	}
-	.bottom_navigation button.last {
-		float: right;
-	}
-</style>
-<div class=\"bottom_navigation\">
-	<button id=\"btnPrev\" class=\"first prev\" onclick=\"articleController.prev();\">&leftarrow;</button>
-	<button id=\"btnNext\" class=\"last next\" onclick=\"articleController.next();\">&rightarrow;</button>
-</div>]]>
-	</string>
-
-	<!-- HYPHENATION -->
-	<string name="LABELCOLOR_TEMPLATE" formatted="false" translatable="false">
-	<![CDATA[<span style=\"color: %s; background-color: %s\">%s</span>]]>
-	</string>
-
-	<!-- ATTACHMENTS -->
-	<string name="ATTACHMENT_IMAGES_TEMPLATE" formatted="false" translatable="false"><![CDATA[<items:{it|\\<img src=\"<it>\" />\\<br/>\n}>]]></string>
-	<string name="ATTACHMENT_MEDIA_TEMPLATE" formatted="false" translatable="false"><![CDATA[<items:{it|\\<a href=\"<it>\"><linkText>\\</a>\n}>]]></string>
-
-	<!-- NOTES -->
-	<string name="NOTE_TEMPLATE" formatted="false" translatable="false"><![CDATA[<div id=\"note\">$NOTE$</div>]]></string>
-
-	<!-- EVERYTHING ELSE -->
-	<string name="ALIGN_JUSTIFY">justify</string>
-	<string name="ALIGN_LEFT">left</string>
-	<string name="HTML_THEME_DARK">darkTheme</string>
-	<string name="HTML_THEME_LIGHT">lightTheme</string>
-	<string name="HTML_THEME_BLACK">blackTheme</string>
-	<string name="HTML_THEME_WHITE">whiteTheme</string>
-
 </resources>

@@ -37,6 +37,8 @@ import android.view.Display;
 import android.view.WindowManager;
 import android.widget.Toast;
 
+import com.orhanobut.logger.Logger;
+
 import org.stringtemplate.v4.ST;
 import org.ttrssreader.R;
 import org.ttrssreader.gui.CategoryActivity;
@@ -306,7 +308,7 @@ public class Controller extends Constants implements OnSharedPreferenceChangeLis
 		try {
 			HttpResponseCache.install(httpCacheDir, httpCacheSize);
 		} catch (IOException e) {
-			e.printStackTrace();
+			Logger.e(TAG, e);
 		}
 	}
 

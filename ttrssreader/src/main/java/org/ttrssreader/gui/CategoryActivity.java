@@ -302,8 +302,13 @@ public class CategoryActivity extends MenuActivity implements IItemSelectedListe
 				}
 				break;
 			case FEED:
-				FeedListFragment feeds = (FeedListFragment) source;
-				displayHeadlines(selectedId, feeds.getCategoryId(), false);
+
+				Intent i = new Intent(this, ScrollingArticleActivity.class);
+				i.putExtra(ScrollingArticleActivity.FEED_ID, selectedId);
+				startActivity(i);
+
+//				FeedListFragment feeds = (FeedListFragment) source;
+//				displayHeadlines(selectedId, feeds.getCategoryId(), false);
 				break;
 			default:
 				Toast.makeText(this, "Invalid request!", Toast.LENGTH_SHORT).show();

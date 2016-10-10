@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scrolled_article"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/scrolled_article_title"
+        android:background="@color/themeDarkTextColor"
+        android:textColor="@color/themeDarkPrimaryDark"
+        android:layout_width="match_parent"
+        android:layout_height="50dip"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:paddingLeft="5dip"
+        android:paddingRight="5dip"
+        android:textIsSelectable="false" />
+
+    <WebView
+        android:id="@+id/scrolled_article_content"
+        android:layout_below="@id/scrolled_article_title"
+        android:layout_width="match_parent"
+        android:layout_marginLeft="5dip"
+        android:layout_marginRight="5dip"
+        android:layout_height="200dip" />
+
+</RelativeLayout>

@@ -71,5 +71,7 @@ dependencies {
     // https://developer.android.com/training/articles/security-gms-provider.html
     // Only used in productFlavour "play"
     playCompile 'com.google.android.gms:play-services-base:9.4.0'
+    compile 'com.android.support:cardview-v7:23.3.0'
+    compile 'com.orhanobut:logger:1.15'
 }
 

@@ -27,6 +27,9 @@ import android.app.Application;
 import android.content.Context;
 import android.os.Build;
 
+import com.orhanobut.logger.LogLevel;
+import com.orhanobut.logger.Logger;
+
 public class MyApplication extends Application {
 
 	private static MyApplication instance;
@@ -35,6 +38,8 @@ public class MyApplication extends Application {
 	private static final String TAG = MyApplication.class.getSimpleName();
 
 	public void onCreate() {
+
+		initLogging();
 
 		// workaround for https://code.google.com/p/android/issues/detail?id=20915
 		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.JELLY_BEAN) {
@@ -57,6 +62,14 @@ public class MyApplication extends Application {
 		Controller.getInstance().initialize(this);
 		DBHelper.getInstance().initialize(this);
 		Data.getInstance().initialize(this);
+	}
+
+	private void initLogging() {
+		Logger
+			.init("ttrss-reader")           // default PRETTYLOGGER or use just init()
+			.methodCount(1)
+			.logLevel(LogLevel.FULL)        // default LogLevel.FULL
+			.methodOffset(2);               // default 0
 	}
 
 	@Override

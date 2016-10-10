@@ -21,6 +21,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.MalformedJsonException;
+import com.orhanobut.logger.Logger;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -355,7 +356,7 @@ public class JSONConnector {
 		try {
 			reader.beginObject();
 		} catch (Exception e) {
-			e.printStackTrace();
+			Logger.e(TAG, e);
 			return null;
 		}
 		while (reader.hasNext()) {
@@ -440,7 +441,7 @@ public class JSONConnector {
 			// Reset error, this is only for an api-bug which returns an empty result for updateFeed
 			pullLastError();
 		} catch (IOException e) {
-			e.printStackTrace();
+			Logger.e(TAG, e);
 			if (!hasLastError) {
 				hasLastError = true;
 				lastError = formatException(e);
@@ -526,7 +527,7 @@ public class JSONConnector {
 							break;
 					}
 				} catch (IllegalArgumentException e) {
-					e.printStackTrace();
+					Logger.e(TAG, e);
 					reader.skipValue();
 				}
 
@@ -685,7 +686,7 @@ public class JSONConnector {
 					label.backgroundColor = reader.nextString();
 					label.checked = true;
 				} catch (IllegalArgumentException e) {
-					e.printStackTrace();
+					Logger.e(TAG, e);
 					reader.skipValue();
 					continue;
 				}
@@ -752,7 +753,7 @@ public class JSONConnector {
 								break;
 						}
 					} catch (IllegalArgumentException e) {
-						e.printStackTrace();
+						Logger.e(TAG, e);
 						reader.skipValue();
 					}
 
@@ -765,7 +766,7 @@ public class JSONConnector {
 			}
 			reader.endArray();
 		} catch (IOException e) {
-			e.printStackTrace();
+			Logger.e(TAG, e);
 		} finally {
 			if (reader != null) try {
 				reader.close();
@@ -839,7 +840,7 @@ public class JSONConnector {
 								break;
 						}
 					} catch (IllegalArgumentException e) {
-						e.printStackTrace();
+						Logger.e(TAG, e);
 						reader.skipValue();
 					}
 
@@ -861,7 +862,7 @@ public class JSONConnector {
 			}
 			reader.endArray();
 		} catch (IOException e) {
-			e.printStackTrace();
+			Logger.e(TAG, e);
 		} finally {
 			if (reader != null) try {
 				reader.close();
@@ -962,7 +963,7 @@ public class JSONConnector {
 				else offset += count;
 
 			} catch (IOException e) {
-				e.printStackTrace();
+				Logger.e(TAG, e);
 			} finally {
 				if (reader != null) {
 					try {
@@ -1102,7 +1103,7 @@ public class JSONConnector {
 		try {
 			return readResult(params, false);
 		} catch (IOException e) {
-			e.printStackTrace();
+			Logger.e(TAG, e);
 		}
 
 		return null;
@@ -1175,7 +1176,7 @@ public class JSONConnector {
 			}
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			Logger.e(TAG, e);
 		} finally {
 			if (reader != null) try {
 				reader.close();

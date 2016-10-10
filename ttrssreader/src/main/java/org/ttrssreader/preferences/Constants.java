@@ -19,12 +19,16 @@ package org.ttrssreader.preferences;
 
 import android.content.SharedPreferences;
 
+import com.orhanobut.logger.Logger;
+
 import org.ttrssreader.utils.Utils;
 
 import java.lang.reflect.Field;
 import java.util.Locale;
 
 public class Constants {
+
+	public static final String TAG = Constants.class.getSimpleName();
 
 	public static final String EMPTY = "";
 	public static final String APPENDED_DEFAULT = "_DEFAULT";
@@ -200,7 +204,7 @@ public class Constants {
 				}
 
 			} catch (SecurityException | IllegalArgumentException | IllegalAccessException e) {
-				e.printStackTrace();
+				Logger.e(TAG, e);
 			} catch (NoSuchFieldException e) {
 				// Ignore, occurrs if a search for field like EMPTY_DEFAULT is started,
 				// this isn't there and shall never

@@ -31,6 +31,8 @@ import android.text.Html;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.orhanobut.logger.Logger;
+
 import org.apache.commons.io.FileUtils;
 import org.ttrssreader.MyApplication;
 import org.ttrssreader.gui.dialogs.ErrorDialog;
@@ -312,7 +314,7 @@ public class DBHelper {
 							try {
 								FileUtils.deleteDirectory(cacheFolder);
 							} catch (IOException e) {
-								e.printStackTrace();
+								Logger.e(TAG, e);
 							}
 						}
 					}
@@ -1451,6 +1453,32 @@ public class DBHelper {
 		return ret;
 	}
 
+	public int[] getArticleIds(int feedId) {
+		if (!isDBAvailable()) {
+			return new int[0];
+		}
+
+		SQLiteDatabase db = getOpenHelper().getReadableDatabase();
+		Cursor c = null;
+		readLock(true);
+		try {
+			c = db.query(TABLE_ARTICLES, new String[] {"_id"}, "feedId=?", new String[]{String.valueOf(feedId)}, null, null, null, null);
+			if (!c.moveToFirst()) {
+				return new int[0];
+			}
+			int[] ids = new int[c.getCount()];
+			for (int i = 0; i < c.getCount(); i++) {
+				ids[i] = c.getInt(0);
+				c.moveToNext();
+			}
+			return ids;
+		} finally {
+			if (c != null && !c.isClosed()) c.close();
+			readLock(false);
+		}
+
+	}
+
 	Set<Label> getLabelsForArticle(int articleId) {
 		if (!isDBAvailable()) return new HashSet<>();
 
@@ -1918,7 +1946,7 @@ public class DBHelper {
 			if (c.moveToFirst()) rf = handleRemoteFileCursor(c);
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			Logger.e(TAG, e);
 		} finally {
 			if (c != null && !c.isClosed()) c.close();
 			readLock(false);
@@ -1959,7 +1987,7 @@ public class DBHelper {
 			}
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			Logger.e(TAG, e);
 		} finally {
 			if (c != null && !c.isClosed()) c.close();
 			readLock(false);
@@ -2065,7 +2093,7 @@ public class DBHelper {
 					+ "ms... (remotefiles: " + rfs.size() + ")");
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			Logger.e(TAG, e);
 		} finally {
 			if (c != null && !c.isClosed()) c.close();
 			readLock(false);

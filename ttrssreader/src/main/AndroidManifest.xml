@@ -75,6 +75,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <activity android:name=".gui.ScrollingArticleActivity"/>
         <activity android:name=".gui.FeedHeadlineActivity"/>
         <activity android:name=".gui.PreferencesActivity"/>
         <activity android:name=".gui.WifiPreferencesActivity">

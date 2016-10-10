@@ -24,6 +24,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import com.orhanobut.logger.Logger;
+
 import org.ttrssreader.controllers.Controller;
 import org.ttrssreader.controllers.DBHelper;
 import org.ttrssreader.controllers.Data;
@@ -110,7 +112,7 @@ class ImageCacher extends AsyncTask<Void, Integer, Void> {
 				}
 				Looper.loop();
 			} catch (Throwable t) {
-				t.printStackTrace();
+				Logger.e(TAG, t);
 			}
 		}
 	}
@@ -362,7 +364,7 @@ class ImageCacher extends AsyncTask<Void, Integer, Void> {
 					if (isCancelled || checkCancelRequested()) break;
 				}
 			} catch (Throwable t) {
-				t.printStackTrace();
+				Logger.e(TAG, t);
 			} finally {
 				articleFilesLocal.put(articleId, finishedFileUrls);
 				if (size > 0) downloaded += size;
