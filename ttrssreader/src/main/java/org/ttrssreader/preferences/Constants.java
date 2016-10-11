@@ -18,6 +18,7 @@
 package org.ttrssreader.preferences;
 
 import android.content.SharedPreferences;
+import android.util.Log;
 
 import org.ttrssreader.utils.Utils;
 
@@ -25,6 +26,8 @@ import java.lang.reflect.Field;
 import java.util.Locale;
 
 public class Constants {
+
+	private static final String TAG = Constants.class.getSimpleName();
 
 	public static final String EMPTY = "";
 	public static final String APPENDED_DEFAULT = "_DEFAULT";
@@ -43,6 +46,7 @@ public class Constants {
 	public static final String KEYSTORE_PASSWORD = "ConnectionKeystorePasswordPreference";
 	public static final String USE_OF_A_LAZY_SERVER = "ConnectionLazyServerPreference";
 	public static final String IGNORE_UNSAFE_CONNECTION_ERROR = "IgnoreUnsafeConnectionError";
+
 	// Connection Default Values
 	public static final String URL_DEFAULT = "https://localhost/";
 	public static final boolean USE_HTTP_AUTH_DEFAULT = false;
@@ -63,6 +67,7 @@ public class Constants {
 	public static final String HIDE_ACTIONBAR = "HideActionbarPreference";
 	public static final String ALLOW_TABLET_LAYOUT = "AllowTabletLayoutPreference";
 	public static final String HIDE_FEED_READ_BUTTONS = "HideFeedReadButtons";
+
 	// Usage Default Values
 	public static final boolean OPEN_URL_EMPTY_ARTICLE_DEFAULT = false;
 	public static final boolean USE_VOLUME_KEYS_DEFAULT = false;
@@ -92,6 +97,7 @@ public class Constants {
 	public static final String DATE_STRING = "DisplayDateFormatPreference";
 	public static final String TIME_STRING = "DisplayTimeFormatPreference";
 	public static final String DATE_TIME_STRING = "DisplayDateTimeFormatPreference";
+
 	// Display Default Values
 	public static final String THEME_DEFAULT = "1";
 	public static final boolean ANIMATIONS_DEFAULT = true;
@@ -126,6 +132,7 @@ public class Constants {
 	public static final String NO_CRASHREPORTS = "NoCrashreportsPreference";
 	public static final String NO_CRASHREPORTS_UNTIL_UPDATE = "NoCrashreportsUntilUpdatePreference";
 	public static final String IS_FIRST_RUN = "IsFirstRun";
+
 	// System Default Values
 	public static final Integer CACHE_FOLDER_MAX_SIZE_DEFAULT = 80;
 	public static final Integer CACHE_IMAGE_MAX_SIZE_DEFAULT = 6 * (int) Utils.MB; // 6 MB
@@ -148,6 +155,7 @@ public class Constants {
 	public static final String LAST_SYNC = "lastSync";
 	public static final String LAST_CLEANUP = "lastCleanup";
 	public static final String ENABLE_WIFI_BASED_SUFFIX = "_pref_enable_wifibased";
+
 	// Internal Default Values
 	public static final long APP_VERSION_CHECK_TIME_DEFAULT = 0;
 	public static final int APP_LATEST_VERSION_DEFAULT = 0;
@@ -159,10 +167,9 @@ public class Constants {
 	public static final long LAST_CLEANUP_DEFAULT = 0;
 	public static final int ACTIVITY_SHOW_PREFERENCES = 43;
 
-	/*
-	 * Resets all preferences to their default values. Only preferences which are mentioned in this class are reset,
-	  * old
-	 * or unsused values don't get reset.
+	/**
+	 * Resets all preferences to their default values. Only preferences which are defined in this class are reset,
+	 * old or unsused values don't get reset.
 	 */
 	public static void resetPreferences(SharedPreferences prefs) {
 		SharedPreferences.Editor editor = prefs.edit();
@@ -184,23 +191,30 @@ public class Constants {
 					case "String": {
 						String defaultValue = (String) fieldDefault.get(null);
 						editor.putString(value, defaultValue);
+						break;
 					}
 					case "boolean": {
 						boolean defaultValue = fieldDefault.getBoolean(null);
 						editor.putBoolean(value, defaultValue);
+						break;
 					}
 					case "int": {
 						int defaultValue = fieldDefault.getInt(null);
 						editor.putInt(value, defaultValue);
+						break;
 					}
 					case "long": {
 						long defaultValue = fieldDefault.getLong(null);
 						editor.putLong(value, defaultValue);
+						break;
+					}
+					default : {
+						Log.e(TAG, "resetPreferences(SharedPreferences prefs) no handling for preferences of type " + type);
 					}
 				}
 
 			} catch (SecurityException | IllegalArgumentException | IllegalAccessException e) {
-				e.printStackTrace();
+				Log.e(TAG, "resetPreferences(SharedPreferences prefs)", e);
 			} catch (NoSuchFieldException e) {
 				// Ignore, occurrs if a search for field like EMPTY_DEFAULT is started,
 				// this isn't there and shall never
@@ -214,16 +228,16 @@ public class Constants {
 
 	public static String constant2Var(String s) {
 		String[] parts = s.split("_");
-		String camelCaseString = "";
+		StringBuilder camelCaseString = new StringBuilder();
 		for (String part : parts) {
-			camelCaseString = camelCaseString + toProperCase(part);
+			camelCaseString.append(toProperCase(part));
 		}
 		// We want the String to starrt with a lower-case letter...
-		return camelCaseString.substring(0, 1).toLowerCase(Locale.getDefault()) + camelCaseString.substring(1);
+		return camelCaseString.substring(0, 1).toLowerCase(Locale.ENGLISH) + camelCaseString.substring(1);
 	}
 
 	private static String toProperCase(String s) {
-		return s.substring(0, 1).toUpperCase(Locale.getDefault()) + s.substring(1).toLowerCase(Locale.getDefault());
+		return s.substring(0, 1).toUpperCase(Locale.ENGLISH) + s.substring(1).toLowerCase(Locale.ENGLISH);
 	}
 
 }
